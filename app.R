@@ -4,7 +4,7 @@
 #
 #    http://shiny.rstudio.com/
 #
-#increase maximum file upload size to 500 MB
+#increase shiny maximum file upload size to 500 MB
 options(shiny.maxRequestSize = 500*1024^2)
 
 library(shiny)
@@ -73,7 +73,7 @@ server <- function(input, output) {
         freezeReactiveValue(input, "sample")
         maf_df<-read.delim(input$maf_file$datapath, stringsAsFactors = F, comment.char = "#", header = T)
         updateSelectInput(inputId = "sample", 
-                          choices = unique(maf_df$sample))
+                          choices = unique(maf_df$Tumor_Sample_Barcode))
     })
     # output$distPlot <- renderPlot({
     #     # generate bins based on input$bins from ui.R

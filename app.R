@@ -24,14 +24,14 @@ ui <- fluidPage(
         sidebarPanel(
             fileInput(inputId = "maf_file", buttonLabel = "Upload...",
                       label = "Load MAF file", 
-                      multiple = F, accept = ".maf"),
-            selectInput(inputId = "sample", label = "Select tumor sample", choices = character()),
+                      multiple = F, accept = ".maf", placeholder = "Please upload a MAF file"),
+            selectInput(inputId = "sample", label = "Select tumor sample", choices = character(), multiple = F),
             downloadButton("report", "Generate Batch report")),
         mainPanel(
             tabsetPanel(
                 tabPanel("Batch",
                          br(),
-                         plotOutput("ss_histplot"),
+                         plotOutput("total_maf_summary"),
                          br(),
                          plotOutput("ds_histplot"),
                          br(),
@@ -55,36 +55,39 @@ ui <- fluidPage(
 )
 
 # Define server logic 
-server <- function(input, output) {
+server <- function(input, output, session) {
     
     input_data<-reactive({
-        maf <- input$maf_file
-        req(maf)
+        req(input$maf_file)
         
         #check file extension
-        ext<-tools::file_ext(input$maf_file$datapath)
+        ext<-tools::file_ext(input$maf_file$name)
+        #print(ext)
         validate(need(ext == "maf", "Please upload a .maf file"))
-        # switch(ext, tsv = vroom::vroom(input$qc_files$datapath, delim = "\t"),
-        #        validate("Invalid file; Please upload a .csv or .tsv file"))
+        # switch(ext, 
+        #        maf = vroom::vroom(input$maf_file$datapath, comment = "#", delim = "\t"),
+        #        validate("Invalid file; Please upload a .maf file")
+        #        )
     })
+    
+    # list for reactive values
+    rv <- reactiveValues()
 
     #load sample names into selectInput
     observeEvent(input$maf_file, {
         freezeReactiveValue(input, "sample")
         maf_df<-read.delim(input$maf_file$datapath, stringsAsFactors = F, comment.char = "#", header = T)
+        rv$maf<-maf_df
+        #rv$samples<-rv$maf$
+        #maf_df$Tumor_Sample_Barcode
         updateSelectInput(inputId = "sample", 
-                          choices = unique(maf_df$Tumor_Sample_Barcode))
+                          choices = unique(rv$maf$Tumor_Sample_Barcode))
     })
-    # output$distPlot <- renderPlot({
-    #     # generate bins based on input$bins from ui.R
-    #     x    <- faithful[, 2]
-    #     bins <- seq(min(x), max(x), length.out = input$bins + 1)
-    # 
-    #     # draw the histogram with the specified number of bins
-    #     hist(x, breaks = bins, col = 'darkgray', border = 'white',
-    #          xlab = 'Waiting time to next eruption (in mins)',
-    #          main = 'Histogram of waiting times')
-    # })
+    output$total_maf_summary <- renderPlot({
+       # draw the histogram with the specified number of bins
+        maf_obj<-read.maf(input_data())
+        plotmafSummary(maf_obj)
+    })
 }
 
 # Run the application 

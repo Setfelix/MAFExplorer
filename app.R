@@ -26,31 +26,32 @@ ui <- fluidPage(
                       label = "Load MAF file", 
                       multiple = F, accept = ".maf", placeholder = "Please upload a MAF file"),
             selectInput(inputId = "sample", label = "Select tumor sample", choices = character(), multiple = F),
+            selectInput(inputId = "gene", label = "Select gene", choices = character(), multiple = F),
             checkboxGroupInput("var_class", label = "Variant class", choices = character()),
             checkboxGroupInput("var_type", label = "Variant type", choices = character()),
-            downloadButton("report", "Generate Batch report")),
+            downloadButton("report", "Generate Batch report"), width = 3),
         mainPanel(
             tabsetPanel(
                 tabPanel("Batch",
                          #br(),
                          fluidRow(
-                             column(width = 5,
+                             column(width = 6,
                                 h4("MAF Summary"),
                                 plotOutput("batch_maf_summary")
                              ),
-                             column(width = 5,
+                             column(width = 6,
                                  h4("Top 20 mutated genes"),
                                  plotOutput("oncoplot")
                              )
                          ),
                          fluidRow(
-                            column(width = 5,
-                            h4("Sample summary"),
-                            plotOutput("sample_summ") 
-                            ),
-                            column(width = 5,
-                            h4("Gene summary"),
-                            plotOutput("gene_summ")
+                            column(width = 6,
+                                   h4("Sample summary"),
+                                   dataTableOutput("sample_summ") 
+                                   ),
+                            column(width = 6,
+                                   h4("Gene summary"),
+                                   dataTableOutput("gene_summ")
                             )
                          )
                          
@@ -65,7 +66,7 @@ ui <- fluidPage(
                 ),
                 tabPanel("Gene")
             )
-        )
+        , width = 9)
     )
 )
 
@@ -99,8 +100,9 @@ server <- function(input, output, session) {
         #maf_df$Tumor_Sample_Barcode
         
         #get sample names
-        updateSelectInput(inputId = "sample", 
-                          choices = unique(rv$maf$Tumor_Sample_Barcode))
+        updateSelectInput(inputId = "sample", choices = unique(rv$maf$Tumor_Sample_Barcode))
+        #get gene names
+        updateSelectInput(inputId = "gene", choices = unique(rv$maf$Hugo_Symbol))
         #get variant classes
         updateCheckboxGroupInput(inputId = "var_class", choices = unique(rv$maf$Variant_Classification))
         #get variant type
@@ -112,14 +114,16 @@ server <- function(input, output, session) {
             # draw the histogram with the specified number of bins
             plotmafSummary(rv$maf_obj, addStat = 'median')
         })
-        #TCGA compare
+        #oncoplot
         output$oncoplot <- renderPlot({
             oncoplot(maf = rv$maf_obj)
         })
-        #Rainfall plot
-        output$rainfall <- renderPlot({
-            rainfallPlot(maf = rv$maf_obj, detectChangePoints = TRUE, pointSize = 0.4)
-        })
+        #sample summary
+        output$sample_summ<-renderDataTable(getSampleSummary(x=rv$maf_obj), 
+                                            options = list(paging = TRUE, pageLength = 5, scrollX= TRUE))
+        #gene summary
+        output$gene_summ<-renderDataTable(getGeneSummary(x=rv$maf_obj), 
+                                          options = list(paging = TRUE, pageLength = 5, scrollX=TRUE))
         
     })
     

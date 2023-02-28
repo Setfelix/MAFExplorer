@@ -10,6 +10,7 @@ options(shiny.maxRequestSize = 500*1024^2)
 library(shiny)
 library(tidyverse)
 library(maftools)
+#library(DT)
 
 # make relevant functions
 
@@ -119,11 +120,21 @@ server <- function(input, output, session) {
             oncoplot(maf = rv$maf_obj)
         })
         #sample summary
-        output$sample_summ<-renderDataTable(getSampleSummary(x=rv$maf_obj), 
-                                            options = list(paging = TRUE, pageLength = 5, scrollX= TRUE))
+        output$sample_summ<-DT::renderDataTable(
+            DT::datatable(getSampleSummary(x=rv$maf_obj), extensions = c("Buttons", "Scroller"), fillContainer = T,
+                          rownames = FALSE,
+                      options = list(paging = TRUE, scrollX= TRUE, ordering = TRUE, scrollY= TRUE,
+                                     dom = 'BSfrtip', pageLength = 5,
+                                     buttons = c('copy', 'csv', 'excel')), class = 'display')
+        , server = FALSE)
         #gene summary
-        output$gene_summ<-renderDataTable(getGeneSummary(x=rv$maf_obj), 
-                                          options = list(paging = TRUE, pageLength = 5, scrollX=TRUE))
+        output$gene_summ<-DT::renderDataTable(
+            DT::datatable(getGeneSummary(x=rv$maf_obj), extensions = c("Buttons", "Scroller"), fillContainer = T,
+                          rownames = FALSE,
+                          options = list(paging = TRUE, scrollX=TRUE, ordering = TRUE, pageLength = 5,
+                                         scrollY=TRUE, dom = 'BSfrtip', buttons = c('copy', 'csv', 'excel')),
+                          class = 'display')
+        , server = FALSE)
         
     })
     

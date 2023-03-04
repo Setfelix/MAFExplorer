@@ -65,6 +65,7 @@ ui <- fluidPage(
                                     h4("Amino acid changes on protein structure"),
                                     plotOutput("gene_lollipop"),
                                     br(),
+                                    h4("Variants in selected gene"),
                                     DT::dataTableOutput("gene_data")
                              )
                          ) 
@@ -101,6 +102,7 @@ server <- function(input, output, session) {
         
         
         rv$maf<-read.delim(input$maf_file$datapath, stringsAsFactors = F, comment.char = "#", header = T)
+        rv$maf<-rv$maf %>% filter(FILTER=="PASS")
         # print(head(rv$maf))
         #create maf object
         rv$maf_obj<-read.maf(rv$maf)
@@ -112,17 +114,19 @@ server <- function(input, output, session) {
         #get gene names
         updateSelectInput(inputId = "gene", choices = unique(rv$maf_obj@data$Hugo_Symbol))
         #get variant classes
-        updateCheckboxGroupInput(inputId = "var_class", choices = unique(rv$maf_obj@data$Variant_Classification))
+        updateCheckboxGroupInput(inputId = "var_class", choices = unique(rv$maf_obj@data$Variant_Classification), 
+                                 selected = unique(rv$maf_obj@data$Variant_Classification))
         #get variant type
-        updateCheckboxGroupInput(inputId = "var_type", choices = unique(rv$maf_obj@data$Variant_Type))
+        updateCheckboxGroupInput(inputId = "var_type", choices = unique(rv$maf_obj@data$Variant_Type), 
+                                 selected = unique(rv$maf_obj@data$Variant_Type))
         
         #maf summary plot
         output$batch_maf_summary <- renderPlot({
-           plotmafSummary(rv$maf_obj, addStat = 'median')
+           plotmafSummary(rv$maf_obj, addStat = 'median', textSize = 1)
         })
         #oncoplot
         output$oncoplot <- renderPlot({
-            oncoplot(maf = rv$maf_obj)
+            oncoplot(maf = rv$maf_obj, fontSize = 0.8)
         })
         #sample summary
         output$sample_summ<-DT::renderDataTable({
@@ -150,18 +154,28 @@ server <- function(input, output, session) {
         #     })
         #current_maf_obj<-reactive({rv$maf_obj()})
         #head(current_maf_obj@data)
-        output$gene_lollipop<-renderPlot({lollipopPlot(maf = rv$maf_obj, gene = input$gene)})
+        output$gene_lollipop<-renderPlot({lollipopPlot(maf = read.maf(rv$maf %>%
+                                                                          filter(Variant_Classification %in% input$var_class, 
+                                                                                 Variant_Type %in% input$var_type,
+                                                                                 Hugo_Symbol == input$gene)),
+                                                       gene = input$gene, showDomainLabel = F, domainLabelSize = 1, labPosSize = 1,
+                                                       legendTxtSize = 1)})
 
         # rv$gene_flt_data<-isolate(rv$maf_obj@data) %>% filter(Hugo_Symbol==input$gene,
         #                                           Variant_Classification %in% input$var_class,
         #                                           Variant_Type %in% input$var_type)
         # #print(head(rv$gene_flt_data))
-        # output$gene_data<-DT::renderDataTable({
-        #     DT::datatable(x=rv$gene_flt_data, extensions = c("Buttons"), fillContainer = T,
-        #                   rownames = FALSE,
-        #                   options = list(paging = TRUE, scrollX=TRUE, ordering = TRUE, pageLength = 5,
-        #                                  scrollY=TRUE, dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel')),
-        #                   class = "display")}, server = FALSE)
+        #rv$maf_obj@data %>% 
+        #filter(Hugo_Symbol==input$gene, Variant_Classification %in% input$var_class, Variant_Type %in% input$var_type)
+        maf_data<-reactive({rv$maf_obj@data})
+        output$gene_data<-DT::renderDataTable({
+            DT::datatable(rv$maf_obj@data %>% mutate(DOMAINS=str_trim(DOMAINS)) %>% select(-DOMAINS) %>%
+                              filter(Hugo_Symbol==input$gene, Variant_Classification %in% input$var_class, Variant_Type %in% input$var_type),
+                          extensions = c("Buttons"), fillContainer = T,
+                          rownames = FALSE,
+                          options = list(paging = TRUE, scrollX=TRUE, ordering = TRUE, pageLength = 5,
+                                         scrollY=TRUE, dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel')),
+                          class = "display")}, server = FALSE)
 
     })
     

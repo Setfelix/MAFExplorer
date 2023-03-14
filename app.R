@@ -10,6 +10,7 @@ options(shiny.maxRequestSize = 500*1024^2)
 library(shiny)
 library(tidyverse)
 library(maftools)
+library(mclust)
 #library(DT)
 
 # make relevant functions, objects
@@ -30,12 +31,12 @@ ui <- fluidPage(
             selectInput(inputId = "sample", label = "Select tumor sample", choices = character(), multiple = F),
             selectInput(inputId = "gene", label = "Select gene", choices = character(), multiple = F),
             checkboxGroupInput("var_class", label = "Variant class", choices = character()),
-            checkboxGroupInput("var_type", label = "Variant type", choices = character()),
-            downloadButton("report", "Generate Batch report"), width = 3),
+            checkboxGroupInput("var_type", label = "Variant type", choices = character())
+            , width = 3),
         mainPanel(
             tabsetPanel(
                 tabPanel("Batch",
-                         #br(),
+                         br(),
                          fluidRow(
                              column(width = 6,
                                 h4("MAF Summary"),
@@ -57,23 +58,30 @@ ui <- fluidPage(
                             )
                          )
                 ),
-                tabPanel("Sample"
+                tabPanel("Sample",
+                         fluidRow(column(width = 6, h4("VAF plot"), plotOutput("vafplot")),
+                                  column(width = 6, h4("Hyper mutated regions (Kataegis)"),
+                                         DT::dataTableOutput("raintable")),
+                         fluidRow(column(width = 6, 
+                                         h4("Tumor heterogeneity"), 
+                                         plotOutput("hetplot")),
+                                  column(width = 6, 
+                                         h4("VAF Cluster summary"), 
+                                         DT::dataTableOutput("vaf_cluster_summ"))
+                                  ),
+                                  )
                          ),
                 tabPanel("Gene",
                          fluidRow(
-                             column(width = 12,
-                                    h4("Amino acid changes on protein structure"),
+                             column(width = 12, h4("Amino acid changes on protein structure"), 
                                     plotOutput("gene_lollipop"),
-                                    br(),
                                     h4("Variants in selected gene"),
-                                    DT::dataTableOutput("gene_data")
-                             )
-                         ) 
+                                    DT::dataTableOutput("gene_data"))) 
+                         )
                 )
-            )
-        , width = 9)
+            , width = 9)
+        )
     )
-)
 
 # Define server logic 
 #shinyServer
@@ -146,7 +154,7 @@ server <- function(input, output, session) {
         #print(head(rv$maf))
     })
     #print(head(rv$maf))
-    # #Gene view features
+    #Gene view features
     observeEvent(input$gene, {
         # current_maf<-reactive({
         #     req(rv)
@@ -178,6 +186,49 @@ server <- function(input, output, session) {
                           class = "display")}, server = FALSE)
 
     })
+    
+    #Sample view features
+    observeEvent(input$sample, {
+        #rainfall plot
+        # output$rainplot<-renderPlot({rainfallPlot(maf = read.maf(rv$maf %>%
+        #                                                              filter(Variant_Classification %in% input$var_class, 
+        #                                                                     Variant_Type %in% input$var_type,
+        #                                                                     Tumor_Sample_Barcode == input$sample)), 
+        #                                           detectChangePoints = TRUE,
+        #                                           pointSize = 0.4)
+        # })
+        #VAF plot
+        output$vafplot<-renderPlot({plotVaf(maf = read.maf(rv$maf %>%
+                                                                     filter(Variant_Classification %in% input$var_class, 
+                                                                            Variant_Type %in% input$var_type,
+                                                                            Tumor_Sample_Barcode == input$sample)), 
+                                                  top = 20)
+        })
+        #tumor heterogeneity
+        # sample_het<-reactive({inferHeterogeneity(maf = read.maf(rv$maf %>%
+        #                                                   filter(Variant_Classification %in% input$var_class, 
+        #                                                          Variant_Type %in% input$var_type,
+        #                                                          Tumor_Sample_Barcode == input$sample)),
+        #                                tsb = input$sample)}),
+        output$hetplot<-renderPlot({plotClusters(clusters = inferHeterogeneity(maf = read.maf(rv$maf %>%
+                                                                                                  filter(Variant_Classification %in% input$var_class, 
+                                                                                                         Variant_Type %in% input$var_type,
+                                                                                                         Tumor_Sample_Barcode == input$sample)),
+                                                                               tsb = input$sample))})
+        output$vaf_cluster_summ<-DT::renderDataTable({
+            DT::datatable(inferHeterogeneity(maf = read.maf(rv$maf %>% filter(Variant_Classification %in% input$var_class, 
+                                                                              Variant_Type %in% input$var_type,
+                                                                              Tumor_Sample_Barcode == input$sample)),
+                                             tsb = input$sample)$clusterMeans,
+                          extensions = c("Buttons"), fillContainer = T,
+                          rownames = FALSE,
+                          options = list(paging = TRUE, scrollX=TRUE, ordering = TRUE, pageLength = 5,
+                                         scrollY=TRUE, dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel')),
+                          class = "display")}, server = FALSE)
+                          #})
+    })
+                 
+                 
     
 }
 
